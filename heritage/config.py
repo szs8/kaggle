@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-TRAIN = 'r3y1_train.h5'
-VALIDATION = 'r3y1_validation.h5'
-TEST = 'r3y1_test.h5'
+TRAIN = 'HHP3_train.h5'
+VALIDATION = 'HHP3_validation.h5'
+TEST = 'HHP3_test.h5'
