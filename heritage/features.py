@@ -87,5 +87,6 @@ def createFeatures():
     avg_frame = avg_and_max_fields(claim,avg_fields)
     features_frame = drug_lab_count.join(claims_counted).join(avg_frame).join(days_in_hospital)
     features_frame.HDFStore("HHP_features.h5", 'w')
+
 if __name__ == '__main__':
     createFeatures()
