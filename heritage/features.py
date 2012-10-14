@@ -58,7 +58,7 @@ def avg_and_max_fields(data,fields_concerned):
     for field in fields_concerned:
         null_frame["Max_"+field] = null_series
         null_frame["Mean_"+field] = null_series
-        old_data[field]   = old_data[field].str.replace("+", "").astype(np.float64)
+        old_data[field]   = old_data[field].str.replace("[-|+].*", "").astype(np.float64)
     new_frame = new_frame.join(pd.DataFrame(null_frame))
     new_frame = new_frame.set_index(["MemberID","Year"])
     for row in new_frame.index:
