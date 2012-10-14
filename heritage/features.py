@@ -62,8 +62,8 @@ def avg_and_max_fields(data,fields_concerned):
     new_frame = new_frame.set_index(["MemberID","Year"])
     for row in new_frame.index:
         for field in fields_concerned:  
-            new_frame.ix[(row[0],row[1])]["Max_"+field]  = old_data[(row[0],row[1])][field].max()
-            new_frame.ix[(row[0],row[1])]["Mean_"+field]  = old_data[(row[0],row[1])][field].mean() 
+            new_frame.ix[row]["Max_"+field]  = old_data[row][field].max()
+            new_frame.ix[row]["Mean_"+field]  = old_data[row][field].mean() 
     return new_frame
 def createFeatures():
     data   =   clean.readH5Store("HHP_release3.h5")
@@ -87,6 +87,5 @@ def createFeatures():
     avg_frame = avg_and_max_fields(claim,avg_fields)
     features_frame = drug_lab_count.join(claims_counted).join(avg_frame).join(days_in_hospital)
     features_frame.HDFStore("HHP_features.h5", 'w')
-
 if __name__ == '__main__':
     createFeatures()
