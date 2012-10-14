@@ -10,13 +10,13 @@ def count_drug_lab(data):
     DataFrame returned is MultiIndex on MemberID and Year
     """
     fields       = data["DSFS"].unique()
-    new_frame   = pandas.DataFrame( [{"MemberID":x[0],"Year":x[1]} for x in sorted(data.set_index(["MemberID","Year"]).index.unique())])
-    null_series = pandas.Series(np.array(np.repeat(np.nan,len(new_frame.index)),dtype=np.object))
+    new_frame   = pd.DataFrame( [{"MemberID":x[0],"Year":x[1]} for x in sorted(data.set_index(["MemberID","Year"]).index.unique())])
+    null_series = pd.Series(np.array(np.repeat(np.nan,len(new_frame.index)),dtype=np.object))
     null_frame = {}
     for field in fields:
         null_frame["Drug_"+field] = null_series
         null_frame["Lab_"+field] = null_series
-    new_frame= new_frame.join(pandas.DataFrame(null_frame))
+    new_frame= new_frame.join(pd.DataFrame(null_frame))
     new_frame = new_frame.set_index(["MemberID","Year"])
     for row in data.iterrows():
         new_frame.ix[(row[1]["MemberID"],row[1]["Year"])]["Drug_"+row[1]["DSFS"]]  =  row[1]["DrugCount"]
@@ -29,16 +29,16 @@ def widen_on_fields(data,fields_counted):
     DataFrame returned is MultiIndex on MemberID and Year
     """
     fields_appended = []
-    new_frame  = pandas.DataFrame( [{"MemberID":x[0],"Year":x[1]} for x in sorted(data.set_index(["MemberID","Year"]).index.unique())])
-    zero_series = pandas.Series(np.array(np.repeat(0,len(new_frame.index))))
+    new_frame  = pd.DataFrame( [{"MemberID":x[0],"Year":x[1]} for x in sorted(data.set_index(["MemberID","Year"]).index.unique())])
+    zero_series = pd.Series(np.array(np.repeat(0,len(new_frame.index))))
     null_frame = {}
     for field in fields_counted:
         unique_fields = data[field].unique()
         fields_appended += [field +"_" + str(x) for x in unique_fields ]
     for field in fields_appended:
         null_frame[field] = zero_series
-    null_frame = pandas.DataFrame(null_frame)
-    new_frame = new_frame.join(pandas.DataFrame(null_frame))
+    null_frame = pd.DataFrame(null_frame)
+    new_frame = new_frame.join(pd.DataFrame(null_frame))
     new_frame = new_frame.set_index(["MemberID","Year"])
     for row in data.iterrows():
         for field in fields_counted:
@@ -51,15 +51,15 @@ def avg_and_max_fields(data,fields_concerned):
     It iterates over fields and returns field with max and avg for each item.
     DataFrame returned is MultiIndex on MemberID and Year
     """
-    new_frame  = pandas.DataFrame( [{"MemberID":x[0],"Year":x[1]} for x in sorted(data.set_index(["MemberID","Year"]).index.unique())])
-    null_series = pandas.Series(np.array(np.repeat(np.nan,len(new_frame.index)),dtype=np.object))
+    new_frame  = pd.DataFrame( [{"MemberID":x[0],"Year":x[1]} for x in sorted(data.set_index(["MemberID","Year"]).index.unique())])
+    null_series = pd.Series(np.array(np.repeat(np.nan,len(new_frame.index)),dtype=np.object))
     null_frame =  {}
     old_data = data.set_index(["MemberID","Year"])
     for field in fields_concerned:
         null_frame["Max_"+field] = null_series
         null_frame["Mean_"+field] = null_series
-        old_data[field]   = old_data[field].str.replace("+", "").astype(np.float64)
-    new_frame = new_frame.join(pandas.DataFrame(null_frame))
+        old_data[field]   = old_data[field].str.replace("[-|+].*", "").astype(np.float64)
+    new_frame = new_frame.join(pd.DataFrame(null_frame))
     new_frame = new_frame.set_index(["MemberID","Year"])
     for row in new_frame.index:
         for field in fields_concerned:  
@@ -67,15 +67,20 @@ def avg_and_max_fields(data,fields_concerned):
             new_frame.ix[[row]]["Mean_"+field]  = old_data.ix[[row]][field].mean() 
     return new_frame
 def createFeatures():
+    """
+    This is just a sample script function showing the functionality of 
+    widen_on_fields
+    avg_and_max_fields
+    """
     data   =   clean.readH5Store("HHP_release3.h5")
     claim  = data["claim"]
     drug   = data["drug"]
     lab    = data["lab"]
     member = data["member"]
     dih    = data["dih"]
-    dih    = dih.join(pandas.DataFrame({"Year":np.repeat("Y1",len(dih.index))}))
+    dih    = dih.join(pd.DataFrame({"Year":np.repeat("Y1",len(dih.index))}))
     dih_3  = data["dih_y3"]
-    dih_3  = dih_3.join(pandas.DataFrame({"Year":np.repeat("Y2",len(dih_3.index))}))
+    dih_3  = dih_3.join(pd.DataFrame({"Year":np.repeat("Y2",len(dih_3.index))}))
     days_in_hospital   = dih.append(dih_3)
     days_in_hospital = days_in_hospital.set_index(["MemberID","Year"])
     days_in_hospital.columns =  ["NextYearTruncated","Target"]
@@ -85,9 +90,8 @@ def createFeatures():
     claim_counting_fields = ["Specialty", "PlaceSvc","LengthOfStay", "PrimaryConditionGroup", "CharlsonIndex","ProcedureGroup"]
     claims_counted = widen_on_fields(claim,claim_counting_fields)
     avg_fields = ["PayDelay"]
-    
     avg_frame = avg_and_max_fields(claim,avg_fields)
-    features_frame = drug_lab_count.join(claims_counted).join(avg_frame).join(days_in_hospital)
+    features_frame = drug_lab_count.join(claims_counted,how="outer").join(avg_frame,how="outer").join(days_in_hospital,how="outer")
     features_frame.HDFStore("HHP_features.h5", 'w')
 if __name__ == '__main__':
     createFeatures()
