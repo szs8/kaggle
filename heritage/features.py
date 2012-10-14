@@ -58,12 +58,13 @@ def avg_and_max_fields(data,fields_concerned):
     for field in fields_concerned:
         null_frame["Max_"+field] = null_series
         null_frame["Mean_"+field] = null_series
+        old_data[field]   = old_data[field].str.replace("+", "").astype(np.float64)
     new_frame = new_frame.join(pandas.DataFrame(null_frame))
     new_frame = new_frame.set_index(["MemberID","Year"])
     for row in new_frame.index:
         for field in fields_concerned:  
-            new_frame.ix[row]["Max_"+field]  = old_data[row][field].max()
-            new_frame.ix[row]["Mean_"+field]  = old_data[row][field].mean() 
+            new_frame.ix[[row]]["Max_"+field]  = old_data.ix[[row]][field].max()
+            new_frame.ix[[row]]["Mean_"+field]  = old_data.ix[[row]][field].mean() 
     return new_frame
 def createFeatures():
     data   =   clean.readH5Store("HHP_release3.h5")
@@ -84,6 +85,7 @@ def createFeatures():
     claim_counting_fields = ["Specialty", "PlaceSvc","LengthOfStay", "PrimaryConditionGroup", "CharlsonIndex","ProcedureGroup"]
     claims_counted = widen_on_fields(claim,claim_counting_fields)
     avg_fields = ["PayDelay"]
+    
     avg_frame = avg_and_max_fields(claim,avg_fields)
     features_frame = drug_lab_count.join(claims_counted).join(avg_frame).join(days_in_hospital)
     features_frame.HDFStore("HHP_features.h5", 'w')
