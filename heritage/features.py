@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import clean
 np.random.seed(37)
-
 def count_drug_lab(data):
     """
     This function takes in a daterame and appends count of drug and lab per DSFS
@@ -51,20 +50,28 @@ def avg_and_max_fields(data,fields_concerned):
     It iterates over fields and returns field with max and avg for each item.
     DataFrame returned is MultiIndex on MemberID and Year
     """
-    new_frame  = pd.DataFrame( [{"MemberID":x[0],"Year":x[1]} for x in sorted(data.set_index(["MemberID","Year"]).index.unique())])
+    old_data = data
+    new_frame   = pd.DataFrame( [{"MemberID":x[0],"Year":x[1]} for x in sorted(data.set_index(["MemberID","Year"]).index.unique())])
     null_series = pd.Series(np.array(np.repeat(np.nan,len(new_frame.index)),dtype=np.object))
     null_frame =  {}
-    old_data = data.set_index(["MemberID","Year"])
     for field in fields_concerned:
-        null_frame["Max_"+field] = null_series
-        null_frame["Mean_"+field] = null_series
         old_data[field]   = old_data[field].str.replace("[-|+].*", "").astype(np.float64)
     new_frame = new_frame.join(pd.DataFrame(null_frame))
     new_frame = new_frame.set_index(["MemberID","Year"])
-    for row in new_frame.index:
-        for field in fields_concerned:  
-            new_frame.ix[[row]]["Max_"+field]  = old_data.ix[[row]][field].max()
-            new_frame.ix[[row]]["Mean_"+field]  = old_data.ix[[row]][field].mean() 
+    #done this way instead of agg to to take advantage of cython optimization
+    means = old_data.groupby(["MemberID","Year"]).mean() 
+    cols = []
+    for column in means.columns:
+        cols.append("Mean_"+column)
+    means.columns = cols
+    cols = []
+    maxs  = old_data.groupby(["MemberID","Year"]).max()
+    for column in maxs:
+        cols.append("Max_"+column)
+    maxs.columns = cols
+    for field in fields_concerned:  
+        new_frame = new_frame.join(means["Mean_"+field])
+        new_frame = new_frame.join(maxs["Max_"+field])
     return new_frame
 def createFeatures():
     """
