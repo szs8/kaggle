@@ -8,14 +8,14 @@ import config
 np.random.seed(37)
 
 def loadRawData(datadir):
-    """ Read HHP_release3.zip provided by kaggle
-    TODO: Read DaysInHospital_Y3.csv """
+    """ Read HHP_release3.zip provided by kaggle """
     r = {}
     r['claim'] = pd.read_csv(datadir + "/Claims.csv")
     r['drug'] = pd.read_csv(datadir + "/DrugCount.csv")
     r['lab'] = pd.read_csv(datadir + "/LabCount.csv")
     r['member'] = pd.read_csv(datadir + "/Members.csv")
     r['dih'] = pd.read_csv(datadir + "/DaysInHospital_Y2.csv")
+    r['dih_y3'] = pd.read_csv(datadir + "/DaysInHospital_Y3.csv")
     return r
 
 def storeAsH5(filepath, data):
