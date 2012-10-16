@@ -35,7 +35,7 @@ def widen_on_fields(data,fields_counted):
     for row,group in data_in:
         counted_by_index = pd.Series({"MemberID":row[0],"Year":row[1]})
         for field in fields_counted:
-            counts = group.groupby(field).size().rename(lambda x: field+"_%s" %  str(x))
+            counts = group.groupby(field).size().rename(lambda x: str(field)+"_%s" %  str(x))
             counted_by_index = counted_by_index.append(counts)
         counted_data.append(counted_by_index)
     counted_dataFrame = pd.concat(counted_data,axis=1).transpose()
@@ -93,7 +93,7 @@ def createFeatures():
     drug_lab_count = count_drug_lab(drug_lab)# now indexed by MemberID and Year
     drug_end   = datetime.datetime.now()
     logging.debug("drug_done.  IT took %d seconds" % (drug_end - drug_start).seconds)
-    claim_counting_fields = ["Specialty", "PlaceSvc","LengthOfStay", "PrimaryConditionGroup", "CharlsonIndex","ProcedureGroup"]
+    claim_counting_fields = [["Specialty","PlaceSvc"],"LengthOfStay", "PrimaryConditionGroup", "CharlsonIndex","ProcedureGroup"]
     widen_start = datetime.datetime.now()
     claims_counted = widen_on_fields(claim,claim_counting_fields)
     widen_end = datetime.datetime.now()
