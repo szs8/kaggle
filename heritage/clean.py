@@ -30,6 +30,15 @@ def readH5Store(filepath):
     store.close()
     return r
 
+def loadTable(filepath, table):
+    store = pd.HDFStore(filepath, "r")
+    r = store[table]
+    store.close()
+    return r
+
+def loadFeatures(filepath='HHP_release3.h5'):
+    return loadTable(filepath, 'features')
+
 def loadY1Data(filepath='r3y1.h5'):
     """ Raw data provided by kaggle """
     return readH5Store(filepath=filepath)
