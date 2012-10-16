@@ -13,9 +13,11 @@ def widen_on_fields(data,fields_counted):
     rows = [data.MemberID, data.Year]
     res = None
     for field in fields_counted:
-        cols = data.ix[:, field]
+        isList = 1 if isinstance(field, (list, tuple, np.ndarray)) else 0
+        cols = [data.ix[:, i] for i in field] if isList else data.ix[:, field]
         df = pd.crosstab(rows=rows, cols=cols)
-        df.columns = [field + '_' + i for i in df.columns]
+        key = "_".join(field) if isList else field
+        df.columns = [key + '_' + str(i) for i in df.columns]
         res = df if res is None else res.join(df, how="outer")
     return res
 
@@ -23,6 +25,9 @@ data = clean.readH5Store("HHP_release3.h5")
 claim  = data["claim"]
 df = widen_on_fields(claim, ["Specialty", "PlaceSvc","LengthOfStay",
                              "PrimaryConditionGroup", "CharlsonIndex",
-                             "ProcedureGroup"])
-print df
-print df[:5]
+                             "ProcedureGroup", ["Specialty", "PlaceSvc"]])
+
+print len(df), "rows"
+print df.columns
+
+#print df[:5]
