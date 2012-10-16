@@ -16,3 +16,4 @@ research
 *.h5
 *.csv
 *.zip
+/census/clean.py

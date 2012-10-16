@@ -2,8 +2,10 @@
 import numpy as np
 import pandas as pd
 import clean
+import datetime
+import logging
+logging.basicConfig(level=logging.DEBUG)
 np.random.seed(37)
-
 def count_drug_lab(data):
     """
     This function takes in a daterame and appends count of drug and lab per DSFS
@@ -28,22 +30,16 @@ def widen_on_fields(data,fields_counted):
     It iterates over fields and returns count each possible field occured per year
     DataFrame returned is MultiIndex on MemberID and Year
     """
-    fields_appended = []
-    new_frame  = pd.DataFrame( [{"MemberID":x[0],"Year":x[1]} for x in sorted(data.set_index(["MemberID","Year"]).index.unique())])
-    zero_series = pd.Series(np.array(np.repeat(0,len(new_frame.index))))
-    null_frame = {}
-    for field in fields_counted:
-        unique_fields = data[field].unique()
-        fields_appended += [field +"_" + str(x) for x in unique_fields ]
-    for field in fields_appended:
-        null_frame[field] = zero_series
-    null_frame = pd.DataFrame(null_frame)
-    new_frame = new_frame.join(pd.DataFrame(null_frame))
-    new_frame = new_frame.set_index(["MemberID","Year"])
-    for row in data.iterrows():
+    data_in    = data.groupby(["MemberID","Year"])
+    counted_data = [] 
+    for row,group in data_in:
+        counted_by_index = pd.Series({"MemberID":row[0],"Year":row[1]})
         for field in fields_counted:
-            if field in row[1]:
-                new_frame.ix[(row[1]["MemberID"],row[1]["Year"])][field+"_"+str(row[1][field])]  += 1
+            counts = group.groupby(field).size().rename(lambda x: field+"_%s" %  str(x))
+            counted_by_index = counted_by_index.append(counts)
+        counted_data.append(counted_by_index)
+    counted_dataFrame = pd.concat(counted_data,axis=1).transpose()
+    new_frame = counted_dataFrame.set_index(["MemberID","Year"])
     return new_frame
 def avg_and_max_fields(data,fields_concerned):
     """
@@ -51,20 +47,27 @@ def avg_and_max_fields(data,fields_concerned):
     It iterates over fields and returns field with max and avg for each item.
     DataFrame returned is MultiIndex on MemberID and Year
     """
-    new_frame  = pd.DataFrame( [{"MemberID":x[0],"Year":x[1]} for x in sorted(data.set_index(["MemberID","Year"]).index.unique())])
-    null_series = pd.Series(np.array(np.repeat(np.nan,len(new_frame.index)),dtype=np.object))
+    old_data = data
+    new_frame   = pd.DataFrame( [{"MemberID":x[0],"Year":x[1]} for x in sorted(data.set_index(["MemberID","Year"]).index.unique())])
     null_frame =  {}
-    old_data = data.set_index(["MemberID","Year"])
     for field in fields_concerned:
-        null_frame["Max_"+field] = null_series
-        null_frame["Mean_"+field] = null_series
         old_data[field]   = old_data[field].str.replace("[-|+].*", "").astype(np.float64)
     new_frame = new_frame.join(pd.DataFrame(null_frame))
     new_frame = new_frame.set_index(["MemberID","Year"])
-    for row in new_frame.index:
-        for field in fields_concerned:  
-            new_frame.ix[[row]]["Max_"+field]  = old_data.ix[[row]][field].max()
-            new_frame.ix[[row]]["Mean_"+field]  = old_data.ix[[row]][field].mean() 
+    #done this way instead of agg to to take advantage of cython optimization
+    means = old_data.groupby(["MemberID","Year"]).mean() 
+    cols = []
+    for column in means.columns:
+        cols.append("Mean_"+column)
+    means.columns = cols
+    cols = []
+    maxs  = old_data.groupby(["MemberID","Year"]).max()
+    for column in maxs:
+        cols.append("Max_"+column)
+    maxs.columns = cols
+    for field in fields_concerned:  
+        new_frame = new_frame.join(means["Mean_"+field])
+        new_frame = new_frame.join(maxs["Max_"+field])
     return new_frame
 def createFeatures():
     """
@@ -72,7 +75,7 @@ def createFeatures():
     widen_on_fields
     avg_and_max_fields
     """
-    data   =   clean.readH5Store("HHP_release3.h5")
+    data   =  clean.readH5Store("HHP_release3.h5")
     claim  = data["claim"]
     drug   = data["drug"]
     lab    = data["lab"]
@@ -86,12 +89,23 @@ def createFeatures():
     days_in_hospital.columns =  ["NextYearTruncated","Target"]
     drug   = member.merge(drug,on="MemberID")
     drug_lab = drug.merge(lab,how="outer",on=["MemberID","Year","DSFS"])
+    drug_start = datetime.datetime.now()
     drug_lab_count = count_drug_lab(drug_lab)# now indexed by MemberID and Year
+    drug_end   = datetime.datetime.now()
+    logging.debug("drug_done.  IT took %d seconds" % (drug_end - drug_start).seconds)
     claim_counting_fields = ["Specialty", "PlaceSvc","LengthOfStay", "PrimaryConditionGroup", "CharlsonIndex","ProcedureGroup"]
+    widen_start = datetime.datetime.now()
     claims_counted = widen_on_fields(claim,claim_counting_fields)
+    widen_end = datetime.datetime.now()
+    logging.debug("widen_done.  it took %d seconds"% (widen_end - widen_start).seconds)
     avg_fields = ["PayDelay"]
+    avg_start = datetime.datetime.now()
     avg_frame = avg_and_max_fields(claim,avg_fields)
+    avg_end = datetime.datetime.now()
+    logging.debug("avg_done.  it took %d seconds" % (avg_end - avg_start).seconds)
     features_frame = drug_lab_count.join(claims_counted,how="outer").join(avg_frame,how="outer").join(days_in_hospital,how="outer")
-    features_frame.HDFStore("HHP_features.h5", 'w')
+    data["features"] = features_frame
+    clean.storeAsH5("HHP_release3.h5",data)
+
 if __name__ == '__main__':
     createFeatures()
