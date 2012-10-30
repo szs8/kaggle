@@ -5,8 +5,6 @@ import pandas as pd
 
 import config
 
-np.random.seed(37)
-
 def storeAsH5(filepath, data):
     """ Store a dict of DataFrames as a hdf datastore """
     store = pd.HDFStore(filepath, 'w')
@@ -33,12 +31,13 @@ def loadFeatures(filepath='HHP_release3.h5'):
 
 def splitFeatures(features):
     """ Split features into train, validation, and test pieces """
-    mids = pd.Series(features.index.get_level_values("MemberID"))
+    mids = features.index.get_level_values("MemberID")
     trainID, valID, testID = partitionMembers(mids)
-    tidx = np.searchsorted(features.index.get_level_values("MemberID"), trainID)
-    vidx = np.searchsorted(features.index.get_level_values("MemberID"), valID)
-    testidx = np.searchsorted(features.index.get_level_values("MemberID"), testID)
-    return features.ix[tidx], features.ix[vidx], features.ix[testidx]
+    features.reset_index(inplace=1)
+    train = features[features.MemberID.isin(trainID)].set_index(["MemberID", "Year"])
+    val = features[features.MemberID.isin(valID)].set_index(["MemberID", "Year"])
+    test = features[features.MemberID.isin(testID)].set_index(["MemberID", "Year"])
+    return train, val, test
 
 def sample(n, k):
     """ Random sampling without replacement
@@ -54,12 +53,24 @@ def splitSeries(series, ratio=.5):
     b = s.drop(a.index)
     return a.reset_index(drop=1), b.reset_index(drop=1)
 
+def splitArray(arr, ratio=-.5, seed=None):
+    """ Randomly split the given array into 2 pieces based
+    on the given ratio. Note that this function first
+    uniquifies the arr. """
+    a = np.sort(np.unique(arr))
+    n = len(a)
+    if seed:  np.random.seed(seed)
+    idx = np.sort(sample(n, int(np.floor(n*float(.5)))))
+    return a[idx], a[np.setdiff1d(np.arange(n), idx)]
+
 def partitionMembers(memberID):
     """ Partition MemberID into train, validation and test sets
-    The current split is :
-    50% for training
-    25% for validation
+    The current split is : 50% for trainin,  25% for validation, and
     25% for test  """
-    train, remaining = splitSeries(memberID)
-    validation, test = splitSeries(remaining)
-    return train, validation, test
+    train, rest = splitArray(memberID, 0.5, seed=47)
+    val, test = splitArray(rest, 0.5, seed=52)
+    return train, val, test
+
+def randomDF():
+    return pd.DataFrame({'a': np.arange(100), 'b': np.random.randn(100),
+                         'c': np.random.randn(100)})
